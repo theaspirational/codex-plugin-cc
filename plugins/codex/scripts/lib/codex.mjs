@@ -67,6 +67,8 @@ function buildThreadParams(cwd, options = {}) {
     approvalPolicy: options.approvalPolicy ?? "never",
     sandbox: options.sandbox ?? "read-only",
     serviceName: SERVICE_NAME,
+    // Native review has no turn/start effort field; inherit the explicit thread override.
+    ...(options.effort != null ? { config: { model_reasoning_effort: options.effort } } : {}),
     ephemeral: options.ephemeral ?? true
   };
 }
@@ -1009,6 +1011,7 @@ export async function runAppServerReview(cwd, options = {}) {
     emitProgress(options.onProgress, "Starting Codex review thread.", "starting");
     const thread = await startThread(client, cwd, {
       model: options.model,
+      effort: options.effort,
       sandbox: "read-only",
       ephemeral: true,
       threadName: options.threadName

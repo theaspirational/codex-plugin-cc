@@ -68,7 +68,7 @@ const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const REVIEW_SCHEMA = path.join(ROOT_DIR, "schemas", "review-output.schema.json");
 const DEFAULT_STATUS_WAIT_TIMEOUT_MS = 240000;
 const DEFAULT_STATUS_POLL_INTERVAL_MS = 2000;
-const VALID_REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+const VALID_REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 const MODEL_ALIASES = new Map([["spark", "gpt-5.3-codex-spark"]]);
 const STOP_REVIEW_TASK_MARKER = "Run a stop-gate review of the previous Claude turn.";
 
@@ -77,9 +77,9 @@ function printUsage() {
     [
       "Usage:",
       "  node scripts/codex-companion.mjs setup [--enable-review-gate|--disable-review-gate] [--json]",
-      "  node scripts/codex-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>]",
-      "  node scripts/codex-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [focus text]",
-      "  node scripts/codex-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model|spark>] [--effort <none|minimal|low|medium|high|xhigh>] [prompt]",
+      `  node scripts/codex-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|spark>] [--effort <${[...VALID_REASONING_EFFORTS].join("|")}>]`,
+      `  node scripts/codex-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [--model <model|spark>] [--effort <${[...VALID_REASONING_EFFORTS].join("|")}>] [focus text]`,
+      `  node scripts/codex-companion.mjs task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model|spark>] [--effort <${[...VALID_REASONING_EFFORTS].join("|")}>] [prompt]`,
       "  node scripts/codex-companion.mjs transfer [--source <claude-jsonl>] [--json]",
       "  node scripts/codex-companion.mjs status [job-id] [--all] [--json]",
       "  node scripts/codex-companion.mjs result [job-id] [--json]",
@@ -121,7 +121,7 @@ function normalizeReasoningEffort(effort) {
   }
   if (!VALID_REASONING_EFFORTS.has(normalized)) {
     throw new Error(
-      `Unsupported reasoning effort "${effort}". Use one of: none, minimal, low, medium, high, xhigh.`
+      `Unsupported reasoning effort "${effort}". Use one of: ${[...VALID_REASONING_EFFORTS].join(", ")}.`
     );
   }
   return normalized;
@@ -365,11 +365,13 @@ async function executeReviewRun(request) {
   });
   const focusText = request.focusText?.trim() ?? "";
   const reviewName = request.reviewName ?? "Review";
+  const selection = `Model: ${request.requestedModel ?? request.model ?? "default"} · Effort: ${request.effort ?? "default"}\n`;
   if (reviewName === "Review") {
     const reviewTarget = validateNativeReviewRequest(target, focusText);
     const result = await runAppServerReview(request.cwd, {
       target: reviewTarget,
       model: request.model,
+      effort: request.effort,
       onProgress: request.onProgress
     });
     const payload = {
@@ -384,7 +386,7 @@ async function executeReviewRun(request) {
         reasoning: result.reasoningSummary
       }
     };
-    const rendered = renderNativeReviewResult(
+    const rendered = selection + renderNativeReviewResult(
       {
         status: result.status,
         stdout: result.reviewText,
@@ -411,6 +413,7 @@ async function executeReviewRun(request) {
   const result = await runAppServerTurn(context.repoRoot, {
     prompt,
     model: request.model,
+    effort: request.effort,
     sandbox: "read-only",
     outputSchema: readOutputSchema(REVIEW_SCHEMA),
     onProgress: request.onProgress
@@ -445,7 +448,7 @@ async function executeReviewRun(request) {
     threadId: result.threadId,
     turnId: result.turnId,
     payload,
-    rendered: renderReviewResult(parsed, {
+    rendered: selection + renderReviewResult(parsed, {
       reviewLabel: reviewName,
       targetLabel: context.target.label,
       reasoningSummary: result.reasoningSummary
@@ -711,13 +714,15 @@ function enqueueBackgroundTask(cwd, job, request) {
 
 async function handleReviewCommand(argv, config) {
   const { options, positionals } = parseCommandInput(argv, {
-    valueOptions: ["base", "scope", "model", "cwd"],
+    valueOptions: ["base", "scope", "model", "effort", "cwd"],
     booleanOptions: ["json", "background", "wait"],
     aliasMap: {
       m: "model"
     }
   });
 
+  const effort = normalizeReasoningEffort(options.effort);
+  const model = normalizeRequestedModel(options.model);
   const cwd = resolveCommandCwd(options);
   const workspaceRoot = resolveCommandWorkspace(options);
   const focusText = positionals.join(" ").trim();
@@ -743,7 +748,9 @@ async function handleReviewCommand(argv, config) {
         cwd,
         base: options.base,
         scope: options.scope,
-        model: options.model,
+        model,
+        requestedModel: options.model,
+        effort,
         focusText,
         reviewName: config.reviewName,
         onProgress: progress

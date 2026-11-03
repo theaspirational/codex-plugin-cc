@@ -2257,3 +2257,50 @@ test("setup and status honor --cwd when reading shared session runtime", () => {
   assert.equal(payload.sessionRuntime.mode, "shared");
   assert.equal(payload.sessionRuntime.endpoint, "unix:/tmp/fake-broker.sock");
 });
+
+for (const command of ["review", "adversarial-review"]) {
+  for (const effort of [null, "high", "max"]) {
+    test(`${command} forwards requested selection (${effort ?? "default"})`, () => {
+      const repo = makeTempDir();
+      const binDir = makeTempDir();
+      installFakeCodex(binDir);
+      initGitRepo(repo);
+      fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
+      run("git", ["add", "README.md"], { cwd: repo });
+      run("git", ["commit", "-m", "init"], { cwd: repo });
+      const args = effort ? ["--model", "test-model", "--effort", effort] : [];
+      const result = run("node", [SCRIPT, command, "--scope", "working-tree", ...args], {
+        cwd: repo, env: buildEnv(binDir)
+      });
+      assert.equal(result.status, 0, result.stderr);
+      const state = JSON.parse(fs.readFileSync(path.join(binDir, "fake-codex-state.json"), "utf8"));
+      const params = command === "review" ? state.lastThreadStart : state.lastTurnStart;
+      assert.equal(params.model, effort ? "test-model" : null);
+      assert.equal(command === "review" ? params.config?.model_reasoning_effort ?? null : params.effort, effort);
+      assert.ok(result.stdout.includes(`Model: ${effort ? "test-model" : "default"} · Effort: ${effort ?? "default"}`), result.stdout);
+    });
+  }
+}
+for (const command of ["review", "adversarial-review", "task"]) {
+  for (const effort of ["ultra", "garbage"]) {
+    test(`${command} rejects effort ${effort}`, () => {
+      const result = run("node", [SCRIPT, command, "--effort", effort], { cwd: makeTempDir() });
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Unsupported reasoning effort/);
+      assert.match(result.stderr, /none, minimal, low, medium, high, xhigh, max/);
+    });
+  }
+}
+
+test("task accepts max reasoning effort", () => {
+  const repo = makeTempDir();
+  const binDir = makeTempDir();
+  installFakeCodex(binDir);
+  initGitRepo(repo);
+  const result = run("node", [SCRIPT, "task", "--effort", "max", "investigate"], {
+    cwd: repo, env: buildEnv(binDir)
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const state = JSON.parse(fs.readFileSync(path.join(binDir, "fake-codex-state.json"), "utf8"));
+  assert.equal(state.lastTurnStart.effort, "max");
+});
