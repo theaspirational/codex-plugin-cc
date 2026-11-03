@@ -782,6 +782,7 @@ test("task forwards model selection and reasoning effort to app-server turn/star
   const fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
   assert.equal(fakeState.lastTurnStart.model, "gpt-5.3-codex-spark");
   assert.equal(fakeState.lastTurnStart.effort, "low");
+  assert.match(result.stdout, /Model: spark · Effort: low/);
 });
 
 test("task logs reasoning summaries and assistant messages to the job log", () => {
@@ -2277,7 +2278,7 @@ for (const command of ["review", "adversarial-review"]) {
       const params = command === "review" ? state.lastThreadStart : state.lastTurnStart;
       assert.equal(params.model, effort ? "test-model" : null);
       assert.equal(command === "review" ? params.config?.model_reasoning_effort ?? null : params.effort, effort);
-      assert.ok(result.stdout.includes(`Model: ${effort ? "test-model" : "default"} · Effort: ${effort ?? "default"}`), result.stdout);
+      assert.ok(result.stdout.includes(`Model: ${effort ? "test-model" : "gpt-6.1-sol (default)"} · Effort: ${effort ?? "medium (default)"}`), result.stdout);
     });
   }
 }
@@ -2304,3 +2305,22 @@ test("task accepts max reasoning effort", () => {
   const state = JSON.parse(fs.readFileSync(path.join(binDir, "fake-codex-state.json"), "utf8"));
   assert.equal(state.lastTurnStart.effort, "max");
 });
+
+for (const command of ["task", "review", "adversarial-review"]) {
+  for (const missing of [false, true]) {
+    test(`${command} renders server selection (missing=${missing})`, () => {
+      const repo = makeTempDir();
+      const binDir = makeTempDir();
+      installFakeCodex(binDir, missing ? "missing-selection" : "review-ok");
+      initGitRepo(repo);
+      fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
+      run("git", ["add", "README.md"], { cwd: repo });
+      run("git", ["commit", "-m", "init"], { cwd: repo });
+      const args = command === "task" ? ["rescue this task"] : ["--scope", "working-tree"];
+      const result = run("node", [SCRIPT, command, ...args], { cwd: repo, env: buildEnv(binDir) });
+      assert.equal(result.status, 0, result.stderr);
+      const expected = missing ? "Model: default · Effort: default" : "Model: gpt-6.1-sol (default) · Effort: medium (default)";
+      assert.ok(result.stdout.includes(expected), result.stdout);
+    });
+  }
+}
