@@ -500,7 +500,7 @@ test("task --resume-last resumes the latest persisted task thread", () => {
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "Resumed the prior run.\nFollow-up prompt accepted.\n");
+  assert.equal(result.stdout, "Model: gpt-6.1-sol (default) · Effort: medium (default)\nResumed the prior run.\nFollow-up prompt accepted.\n");
 });
 
 test("task-resume-candidate returns the latest rescue thread from the current session", () => {
@@ -713,7 +713,7 @@ test("write task output focuses on the Codex result without generic follow-up hi
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
+  assert.equal(result.stdout, "Model: gpt-6.1-sol (default) · Effort: medium (default)\nHandled the requested task.\nTask prompt accepted.\n");
 });
 
 test("task --resume acts like --resume-last without leaking the flag into the prompt", () => {
@@ -852,7 +852,7 @@ test("task waits for the main thread to complete before returning the final resu
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
+  assert.equal(result.stdout, "Model: gpt-6.1-sol (default) · Effort: medium (default)\nHandled the requested task.\nTask prompt accepted.\n");
 });
 
 test("task ignores later subagent messages when choosing the final returned output", () => {
@@ -870,7 +870,7 @@ test("task ignores later subagent messages when choosing the final returned outp
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
+  assert.equal(result.stdout, "Model: gpt-6.1-sol (default) · Effort: medium (default)\nHandled the requested task.\nTask prompt accepted.\n");
 });
 
 test("task can finish after subagent work even if the parent turn/completed event is missing", () => {
@@ -888,7 +888,7 @@ test("task can finish after subagent work even if the parent turn/completed even
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
+  assert.equal(result.stdout, "Model: gpt-6.1-sol (default) · Effort: medium (default)\nHandled the requested task.\nTask prompt accepted.\n");
 });
 
 test("task using the shared broker still completes when Codex spawns subagents", () => {
@@ -918,7 +918,7 @@ test("task using the shared broker still completes when Codex spawns subagents",
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "Handled the requested task.\nTask prompt accepted.\n");
+  assert.equal(result.stdout, "Model: gpt-6.1-sol (default) · Effort: medium (default)\nHandled the requested task.\nTask prompt accepted.\n");
 });
 
 test("task --background enqueues a detached worker and exposes per-job status", async () => {
@@ -968,6 +968,13 @@ test("task --background enqueues a detached worker and exposes per-job status", 
   assert.equal(resultPayload.job.id, launchPayload.jobId);
   assert.equal(resultPayload.job.status, "completed");
   assert.match(resultPayload.storedJob.rendered, /Handled the requested task/);
+  assert.match(resultPayload.storedJob.rendered, /Model: gpt-6.1-sol \(default\) · Effort: medium \(default\)/);
+  for (const command of ["status", "result"]) {
+    const rendered = run("node", [SCRIPT, command, launchPayload.jobId], { cwd: repo, env: buildEnv(binDir) });
+    assert.equal(rendered.status, 0, rendered.stderr);
+    assert.match(rendered.stdout, /Model: gpt-6.1-sol \(default\) · Effort: medium \(default\)/);
+  }
+
 });
 
 test("review rejects focus text because it is native-review only", () => {
@@ -2323,4 +2330,19 @@ for (const command of ["task", "review", "adversarial-review"]) {
       assert.ok(result.stdout.includes(expected), result.stdout);
     });
   }
+}
+
+for (const [args, expected] of [
+  [["--model", "spark"], "Model: spark · Effort: medium (default)"],
+  [["--effort", "high"], "Model: gpt-6.1-sol (default) · Effort: high"],
+]) {
+  test(`task partially explicit selection: ${args.join(" ")}`, () => {
+    const repo = makeTempDir();
+    const binDir = makeTempDir();
+    installFakeCodex(binDir);
+    initGitRepo(repo);
+    const result = run("node", [SCRIPT, "task", ...args, "rescue this task"], { cwd: repo, env: buildEnv(binDir) });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.includes(expected), result.stdout);
+  });
 }

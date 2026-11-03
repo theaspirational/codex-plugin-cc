@@ -355,6 +355,12 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
   return findLatestTaskThread(workspaceRoot);
 }
 
+function renderSelection(request, result) {
+  const value = (requested, resolved) =>
+    requested ?? (resolved ? `${resolved} (default)` : "default");
+  return `Model: ${value(request.requestedModel ?? request.model, result.resolvedModel)} · Effort: ${value(request.effort, result.resolvedEffort)}\n`;
+}
+
 async function executeReviewRun(request) {
   ensureCodexAvailable(request.cwd);
   ensureGitRepository(request.cwd);
@@ -365,7 +371,6 @@ async function executeReviewRun(request) {
   });
   const focusText = request.focusText?.trim() ?? "";
   const reviewName = request.reviewName ?? "Review";
-  const selection = `Model: ${request.requestedModel ?? request.model ?? "default"} · Effort: ${request.effort ?? "default"}\n`;
   if (reviewName === "Review") {
     const reviewTarget = validateNativeReviewRequest(target, focusText);
     const result = await runAppServerReview(request.cwd, {
@@ -386,7 +391,7 @@ async function executeReviewRun(request) {
         reasoning: result.reasoningSummary
       }
     };
-    const rendered = selection + renderNativeReviewResult(
+    const rendered = renderSelection(request, result) + renderNativeReviewResult(
       {
         status: result.status,
         stdout: result.reviewText,
@@ -448,7 +453,7 @@ async function executeReviewRun(request) {
     threadId: result.threadId,
     turnId: result.turnId,
     payload,
-    rendered: selection + renderReviewResult(parsed, {
+    rendered: renderSelection(request, result) + renderReviewResult(parsed, {
       reviewLabel: reviewName,
       targetLabel: context.target.label,
       reasoningSummary: result.reasoningSummary
@@ -499,7 +504,7 @@ async function executeTaskRun(request) {
 
   const rawOutput = typeof result.finalMessage === "string" ? result.finalMessage : "";
   const failureMessage = result.error?.message ?? result.stderr ?? "";
-  const rendered = renderTaskResult(
+  const rendered = renderSelection(request, result) + renderTaskResult(
     {
       rawOutput,
       failureMessage,
@@ -604,10 +609,11 @@ function buildTaskJob(workspaceRoot, taskMetadata, write) {
   });
 }
 
-function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, jobId }) {
+function buildTaskRequest({ cwd, model, requestedModel, effort, prompt, write, resumeLast, jobId }) {
   return {
     cwd,
     model,
+    requestedModel,
     effort,
     prompt,
     write,
@@ -800,6 +806,7 @@ async function handleTask(argv) {
     const request = buildTaskRequest({
       cwd,
       model,
+      requestedModel: options.model,
       effort,
       prompt,
       write,
@@ -818,6 +825,7 @@ async function handleTask(argv) {
       executeTaskRun({
         cwd,
         model,
+        requestedModel: options.model,
         effort,
         prompt,
         write,

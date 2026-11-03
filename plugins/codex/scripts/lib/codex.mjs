@@ -1048,6 +1048,8 @@ export async function runAppServerReview(cwd, options = {}) {
       status: buildResultStatus(turnState),
       threadId: turnState.threadId,
       sourceThreadId,
+      resolvedModel: thread.model,
+      resolvedEffort: thread.reasoningEffort,
       turnId: turnState.turnId,
       reviewText: turnState.reviewText,
       reasoningSummary: turnState.reasoningSummary,
@@ -1103,6 +1105,7 @@ export async function runAppServerTurn(cwd, options = {}) {
 
   return withAppServer(cwd, async (client) => {
     let threadId;
+    let selection;
 
     if (options.resumeThreadId) {
       emitProgress(options.onProgress, `Resuming thread ${options.resumeThreadId}.`, "starting");
@@ -1112,6 +1115,7 @@ export async function runAppServerTurn(cwd, options = {}) {
         ephemeral: false
       });
       threadId = response.thread.id;
+      selection = response;
     } else {
       emitProgress(options.onProgress, "Starting Codex task thread.", "starting");
       const response = await startThread(client, cwd, {
@@ -1121,6 +1125,7 @@ export async function runAppServerTurn(cwd, options = {}) {
         threadName: options.persistThread ? options.threadName : options.threadName ?? null
       });
       threadId = response.thread.id;
+      selection = response;
     }
 
     emitProgress(options.onProgress, `Thread ready (${threadId}).`, "starting", {
@@ -1149,6 +1154,8 @@ export async function runAppServerTurn(cwd, options = {}) {
     return {
       status: buildResultStatus(turnState),
       threadId,
+      resolvedModel: selection?.model,
+      resolvedEffort: selection?.reasoningEffort,
       turnId: turnState.turnId,
       finalMessage: turnState.lastAgentMessage,
       reasoningSummary: turnState.reasoningSummary,
