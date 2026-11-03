@@ -1542,7 +1542,7 @@ test("result for a finished write-capable task returns the raw Codex final respo
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /^Handled the requested task\.\nTask prompt accepted\.\n/);
+  assert.match(result.stdout, /^Model: gpt-6.1-sol \(default\) · Effort: medium \(default\)\nHandled the requested task\.\nTask prompt accepted\.\n/);
   assert.match(result.stdout, /Codex session ID: thr_[a-z0-9]+/i);
   assert.match(result.stdout, /Resume in Codex: codex resume thr_[a-z0-9]+/i);
 });

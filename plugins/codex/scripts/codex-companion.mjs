@@ -451,7 +451,7 @@ async function executeReviewRun(request) {
 
   return {
     exitStatus: result.status,
-      selectionLine: renderSelection(request, result).trimEnd(),
+    selectionLine: renderSelection(request, result).trimEnd(),
     threadId: result.threadId,
     turnId: result.turnId,
     payload,
@@ -528,7 +528,7 @@ async function executeTaskRun(request) {
 
   return {
     exitStatus: result.status,
-      selectionLine: renderSelection(request, result).trimEnd(),
+    selectionLine: renderSelection(request, result).trimEnd(),
     threadId: result.threadId,
     turnId: result.turnId,
     payload,

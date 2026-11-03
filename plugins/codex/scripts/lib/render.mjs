@@ -463,9 +463,6 @@ export function renderCancelReport(job) {
   if (job.title) {
     lines.push(`- Title: ${job.title}`);
   }
-  if (job.selectionLine) {
-    lines.push(`  ${job.selectionLine}`);
-  }
   if (job.summary) {
     lines.push(`- Summary: ${job.summary}`);
   }
