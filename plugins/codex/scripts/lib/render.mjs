@@ -123,6 +123,9 @@ function appendActiveJobsTable(lines, jobs) {
 
 function pushJobDetails(lines, job, options = {}) {
   lines.push(`- ${formatJobLine(job)}`);
+  if (job.selectionLine) {
+    lines.push(`  ${job.selectionLine}`);
+  }
   if (job.summary) {
     lines.push(`  Summary: ${job.summary}`);
   }
@@ -403,7 +406,8 @@ export function renderStoredJobResult(job, storedJob) {
     (typeof storedJob?.result?.codex?.stdout === "string" && storedJob.result.codex.stdout) ||
     "";
   if (rawOutput) {
-    const output = rawOutput.endsWith("\n") ? rawOutput : `${rawOutput}\n`;
+    const selection = storedJob?.selectionLine ? `${storedJob.selectionLine}\n` : "";
+    const output = selection + (rawOutput.endsWith("\n") ? rawOutput : `${rawOutput}\n`);
     if (!threadId) {
       return output;
     }
@@ -430,6 +434,9 @@ export function renderStoredJobResult(job, storedJob) {
     lines.push(`Resume in Codex: ${resumeCommand}`);
   }
 
+  if (job.selectionLine) {
+    lines.push(`  ${job.selectionLine}`);
+  }
   if (job.summary) {
     lines.push(`Summary: ${job.summary}`);
   }
@@ -455,6 +462,9 @@ export function renderCancelReport(job) {
 
   if (job.title) {
     lines.push(`- Title: ${job.title}`);
+  }
+  if (job.selectionLine) {
+    lines.push(`  ${job.selectionLine}`);
   }
   if (job.summary) {
     lines.push(`- Summary: ${job.summary}`);
