@@ -1,6 +1,6 @@
 ---
 description: Run a Codex code review against local git state
-argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch]'
+argument-hint: '[--wait|--background] [--model <model|spark>] [--effort <none|minimal|low|medium|high|xhigh|max>] [--base <ref>] [--scope auto|working-tree|branch]'
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion
 ---
@@ -32,6 +32,9 @@ Execution mode rules:
   - `Run in background`
 
 Argument handling:
+- `--model` and `--effort` are runtime-selection flags. Leave both unset unless the user explicitly asks.
+- Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort. Accepted values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`.
+- Pass the requested model through with `--model`; `spark` maps to `gpt-5.3-codex-spark`.
 - Preserve the user's arguments exactly.
 - Do not strip `--wait` or `--background` yourself.
 - Do not add extra review instructions or rewrite the user's intent.
